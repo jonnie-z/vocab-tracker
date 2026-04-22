@@ -24,4 +24,3 @@ func (a API) Routes() *http.ServeMux {
 
 	return mux
 }
-

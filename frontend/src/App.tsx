@@ -1,143 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css'
+import type { NewVocabInput, VocabItem } from './types';
+import {
+  createVocab,
+  deleteVocab as deleteVocabRequest,
+  fetchVocab,
+  updateVocab as updateVocabRequest
+} from './api';
+import VocabForm from './components/VocabForm';
+import VocabItemComponent from './components/VocabItem';
+import FilterBar from './components/FilterBar';
 
-type VocabItem = {
-  id: number;
-  term: string;
-  meaning: string;
-  language: string;
-  learned: boolean;
-};
-
-type VocabItemProps = {
-  item: VocabItem;
-  onToggle: (id: number) => void;
-  onDelete: (id: number) => void;
-  onUpdate: (item: VocabItem) => void;
-};
-
-function VocabItemComponent({ item, onToggle, onDelete, onUpdate }: VocabItemProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editTerm, setEditTerm] = useState(item.term);
-  const [editMeaning, setEditMeaning] = useState(item.meaning);
-  const [editLanguage, setEditLanguage] = useState(item.language);
-
-  function handleSave() {
-    if (!editTerm.trim() || !editMeaning.trim() || !editLanguage.trim()) {
-      return;
-    }
-
-    onUpdate({
-      ...item,
-      term: editTerm.trim(),
-      meaning: editMeaning.trim(),
-      language: editLanguage.trim(),
-    });
-
-    setIsEditing(false);
-  }
-
-  function handleCancel() {
-    setEditTerm(item.term);
-    setEditMeaning(item.meaning);
-    setEditLanguage(item.language);
-    setIsEditing(false);
-  }
-
-  return (
-    <li>
-      {isEditing ? (
-        <>
-          <input
-            value={editTerm}
-            onChange={(e) => setEditTerm(e.target.value)}
-          />
-          <input
-            value={editMeaning}
-            onChange={(e) => setEditMeaning(e.target.value)}
-          />
-          <input
-            value={editLanguage}
-            onChange={(e) => setEditLanguage(e.target.value)}
-          />
-
-          <button onClick={handleSave}>Save</button>
-          <button onClick={handleCancel}>Cancel</button>
-        </>
-      ) : (
-        <>
-          <b>{item.term}</b> - {item.meaning} ({item.language}){' '}
-          {item.learned ? '✅ Learned' : '📘 Learning'} {' '}
-          <button onClick={() => setIsEditing(true)}>Edit</button>{' '}
-          <button onClick={() => onToggle(item.id)}>Toggle Learned</button>{' '}
-          <button onClick={() => onDelete(item.id)}>Delete</button>
-        </>
-      )}
-    </li >
-  );
-}
-
-type NewVocabInput = {
-  term: string;
-  meaning: string;
-  language: string;
-};
-
-type VocabFormProps = {
-  onAddItem: (input: NewVocabInput) => void;
-}
-
-function VocabForm({ onAddItem }: VocabFormProps) {
-  const [term, setTerm] = useState('');
-  const [meaning, setMeaning] = useState('');
-  const [language, setLanguage] = useState('');
-
-  function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    if (!term.trim() || !meaning.trim() || !language.trim()) {
-      return;
-    }
-
-    onAddItem({
-      term: term.trim(),
-      meaning: meaning.trim(),
-      language: language.trim(),
-    });
-
-    setTerm('');
-    setMeaning('');
-    setLanguage('');
-  }
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <input
-        placeholder="Term"
-        value={term}
-        onChange={(e) => setTerm(e.target.value)}
-      />
-      <input
-        placeholder="Meaning"
-        value={meaning}
-        onChange={(e) => setMeaning(e.target.value)}
-      />
-      <input
-        placeholder="Language"
-        value={language}
-        onChange={(e) => setLanguage(e.target.value)}
-      />
-      <button type="submit">Add</button>
-    </form>
-  );
-}
 
 function App() {
-  const [vocabItems, setVocabItems] = useState<VocabItem[]>([
-    { id: 1, term: 'Baum', meaning: 'tree', language: 'German', learned: true },
-    { id: 2, term: 'chien', meaning: 'dog', language: 'French', learned: false },
-    { id: 3, term: 'casa', meaning: 'house', language: 'Spanish', learned: false },
-  ]);
+  const [vocabItems, setVocabItems] = useState<VocabItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+  useEffect(() => {
+    const loadVocab = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+
+        const data: VocabItem[] = await fetchVocab();
+        setVocabItems(data);
+      } catch (error) {
+        console.error(error);
+        setErrorMessage('Could not load vocabulary items.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadVocab();
+  }, []);
+
   const [languageFilter, setLanguageFilter] = useState('All');
   const [learnedFilter, setLearnedFilter] = useState('all');
   const languages = ['All', ...new Set(vocabItems.map((item) => item.language))];
@@ -154,33 +51,55 @@ function App() {
   });
 
   function toggleLearned(id: number) {
-    setVocabItems(
-      vocabItems.map((item) => item.id === id ? { ...item, learned: !item.learned } : item)
-    );
+    const item = vocabItems.find((item) => item.id === id);
+    if (!item) return;
+
+    updateItem({
+      ...item,
+      learned: !item.learned,
+    });
   }
 
-  function deleteItem(id: number) {
-    setVocabItems(vocabItems.filter((item) => item.id !== id));
+  async function deleteItem(id: number) {
+    try {
+      setErrorMessage('');
+
+      await deleteVocabRequest(id);
+
+      setVocabItems((items) => items.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error(error);
+      setErrorMessage('Could not delete vocabulary item.');
+    }
   }
 
-  function addItem(input: NewVocabInput) {
-    const newItem: VocabItem = {
-      id: Date.now(),
-      term: input.term,
-      meaning: input.meaning,
-      language: input.language,
-      learned: false,
-    };
+  async function addItem(input: NewVocabInput) {
+    try {
+      setErrorMessage('');
 
-    setVocabItems([...vocabItems, newItem]);
+      const createdItem = await createVocab(input);
+      setVocabItems((items) => [...items, createdItem]);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage('Could not create vocabulary item.');
+    }
   }
 
-  function updateItem(updatedItem: VocabItem) {
-    setVocabItems(
-      vocabItems.map((item) =>
-        item.id === updatedItem.id ? updatedItem : item
-      )
-    );
+  async function updateItem(updatedItem: VocabItem) {
+    try {
+      setErrorMessage('');
+
+      const savedItem = await updateVocabRequest(updatedItem);
+
+      setVocabItems((items) =>
+        items.map((item) =>
+          item.id === savedItem.id ? savedItem : item
+        )
+      );
+    } catch (error) {
+      console.error(error);
+      setErrorMessage('Could not update vocabulary item.');
+    }
   }
 
   return (
@@ -189,35 +108,19 @@ function App() {
 
       <VocabForm onAddItem={addItem} />
 
-      <div>
-        <label>
-          Language:{' '}
-          <select
-            value={languageFilter}
-            onChange={(e) => setLanguageFilter(e.target.value)}
-          >
-            {languages.map((language) => (
-              <option key={language} value={language}>
-                {language}
-              </option>
-            ))}
-          </select>
-        </label>
+      <FilterBar
+        languageFilter={languageFilter}
+        learnedFilter={learnedFilter}
+        languages={languages}
+        onLanguageFilterChange={setLanguageFilter}
+        onLearnedFilterChange={setLearnedFilter}
+      />
 
-        <label style={{ marginLeft: '1rem' }}>
-          Status:{' '}
-          <select
-            value={learnedFilter}
-            onChange={(e) => setLearnedFilter(e.target.value)}
-          >
-            <option value="all">All</option>
-            <option value="learned">Learned</option>
-            <option value="unlearned">Learning</option>
-          </select>
-        </label>
-      </div>
+      {isLoading && <p>Loading vocabulary items...</p>}
+      {errorMessage && <p>{errorMessage}</p>}
 
-      {filteredItems.length === 0 ? (
+      {!isLoading &&
+        filteredItems.length === 0 ? (
         <p>No matching vocabulary items.</p>
       ) : (
         <ul>
