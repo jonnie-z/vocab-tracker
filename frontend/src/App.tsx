@@ -12,6 +12,7 @@ import VocabItemComponent from './components/VocabItem';
 import FilterBar from './components/FilterBar';
 
 
+
 function App() {
   const [vocabItems, setVocabItems] = useState<VocabItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +35,37 @@ function App() {
 
     loadVocab();
   }, []);
+
+  const [isQuizMode, setIsQuizMode] = useState(false);
+  const [currentQuizItem, setCurrentQuizItem] = useState<VocabItem | null>(null);
+  const [showAnswer, setShowAnswer] = useState(false);
+
+  function pickRandomQuizItem(items: VocabItem[]) {
+    if (items.length === 0) {
+      setCurrentQuizItem(null);
+      setShowAnswer(false);
+      return;
+    }
+
+    const randomIndex = Math.floor(Math.random() * items.length);
+    setCurrentQuizItem(items[randomIndex]);
+    setShowAnswer(false);
+  }
+
+  function enterQuizMode() {
+    setIsQuizMode(true);
+    pickRandomQuizItem(filteredItems);
+  }
+
+  function exitQuizMode() {
+    setIsQuizMode(false);
+    setCurrentQuizItem(null);
+    setShowAnswer(false);
+  }
+
+  function nextQuizItem() {
+    pickRandomQuizItem(filteredItems);
+  }
 
   const [languageFilter, setLanguageFilter] = useState('All');
   const [learnedFilter, setLearnedFilter] = useState('all');
@@ -106,34 +138,76 @@ function App() {
     <main>
       <h1>Vocabulary Tracker</h1>
 
-      <VocabForm onAddItem={addItem} />
+      <div>
+        {isQuizMode ? (
+          <button onClick={exitQuizMode}>Back to List</button>
+        ) : (
+          <button onClick={enterQuizMode}>Start Quiz</button>
+        )}
+      </div>
 
-      <FilterBar
-        languageFilter={languageFilter}
-        learnedFilter={learnedFilter}
-        languages={languages}
-        onLanguageFilterChange={setLanguageFilter}
-        onLearnedFilterChange={setLearnedFilter}
-      />
+      {isQuizMode ? (
+        <section>
+          {isLoading ? (
+            <p>Loading vocabulary items...</p>
+          ) : errorMessage ? (
+            <p>{errorMessage}</p>
+          ) : filteredItems.length === 0 || !currentQuizItem ? (
+            <p>No vocabulary items available for quiz mode.</p>
+          ) : (
+            <>
+              <h2>{currentQuizItem.term}</h2>
 
-      {isLoading && <p>Loading vocabulary items...</p>}
-      {errorMessage && <p>{errorMessage}</p>}
+              {!showAnswer ? (
+                <button onClick={() => setShowAnswer(true)}>Show Answer</button>
+              ) : (
+                <>
+                  <p>
+                    <strong>Meaning:</strong> {currentQuizItem.meaning}
+                  </p>
+                  <p>
+                    <strong>Language:</strong> {currentQuizItem.language}
+                  </p>
 
-      {!isLoading &&
-        filteredItems.length === 0 ? (
-        <p>No matching vocabulary items.</p>
+                  <button onClick={nextQuizItem}>Got it</button>
+                  <button onClick={nextQuizItem}>Missed it</button>
+                </>
+              )}
+            </>
+          )}
+        </section>
       ) : (
-        <ul>
-          {filteredItems.map((item) => (
-            <VocabItemComponent
-              key={item.id}
-              item={item}
-              onToggle={toggleLearned}
-              onDelete={deleteItem}
-              onUpdate={updateItem}
-            />
-          ))}
-        </ul>
+        <>
+          <VocabForm onAddItem={addItem} />
+
+          <FilterBar
+            languageFilter={languageFilter}
+            learnedFilter={learnedFilter}
+            languages={languages}
+            onLanguageFilterChange={setLanguageFilter}
+            onLearnedFilterChange={setLearnedFilter}
+          />
+
+          {isLoading && <p>Loading vocabulary items...</p>}
+          {errorMessage && <p>{errorMessage}</p>}
+
+          {!isLoading &&
+            (filteredItems.length === 0 ? (
+              <p>No matching vocabulary items.</p>
+            ) : (
+              <ul>
+                {filteredItems.map((item) => (
+                  <VocabItemComponent
+                    key={item.id}
+                    item={item}
+                    onToggle={toggleLearned}
+                    onDelete={deleteItem}
+                    onUpdate={updateItem}
+                  />
+                ))}
+              </ul>
+            ))}
+        </>
       )}
     </main>
   );
