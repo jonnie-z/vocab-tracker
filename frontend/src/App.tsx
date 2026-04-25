@@ -11,7 +11,7 @@ import VocabForm from './components/VocabForm';
 import VocabItemComponent from './components/VocabItem';
 import FilterBar from './components/FilterBar';
 
-
+// pimsleur can get wrecked
 
 function App() {
   const [vocabItems, setVocabItems] = useState<VocabItem[]>([]);
