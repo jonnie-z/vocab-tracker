@@ -12,6 +12,7 @@ import VocabItemComponent from './components/VocabItem';
 import FilterBar from './components/FilterBar';
 
 // pimsleur can get wrecked
+// duolingo can get wrecked too
 
 function App() {
   const [vocabItems, setVocabItems] = useState<VocabItem[]>([]);
